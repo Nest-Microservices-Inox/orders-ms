@@ -3,6 +3,8 @@ import { CreateOrderDto } from './dto/create-order.dto';
 import { PrismaClient } from '@prisma/client';
 import { PaginationDto } from 'src/common';
 import { RpcException } from '@nestjs/microservices';
+import { OrderPaginationDto } from './dto/order-pagination.dto';
+import { ChangeOrderStatusDto } from './dto';
 
 @Injectable()
 export class OrdersService extends PrismaClient implements OnModuleInit {
@@ -19,10 +21,14 @@ export class OrdersService extends PrismaClient implements OnModuleInit {
     });
   }
 
-  async findAll(paginationDto: PaginationDto) {
-    const { page, limit } = paginationDto;
+  async findAll(orderPaginationDto: OrderPaginationDto) {
+    const { page, limit, status } = orderPaginationDto;
 
-    const total = await this.order.count();
+    const total = await this.order.count({
+      where: {
+        status: status,
+      },
+    });
 
     const lastPage = Math.ceil(total / limit);
 
@@ -30,6 +36,9 @@ export class OrdersService extends PrismaClient implements OnModuleInit {
       data: await this.order.findMany({
         skip: (page - 1) * limit,
         take: limit,
+        where: {
+          status: status,
+        },
       }),
       meta: {
         total: total,
@@ -40,22 +49,39 @@ export class OrdersService extends PrismaClient implements OnModuleInit {
   }
 
   async findOne(id: string) {
-    
     const order = await this.order.findUnique({
       where: {
-        id
-      }
-    })
+        id,
+      },
+    });
 
     if (!order) {
       throw new RpcException({
         message: `Order with id: ${id} not found`,
         status: HttpStatus.NOT_FOUND,
-      })
+      });
     }
 
     return order;
+  }
 
+  
+  async changeStatus(changeOrderStatusDto: ChangeOrderStatusDto) {
+    const { id, status } = changeOrderStatusDto;
 
+    const order = await this.findOne(id);
+
+    if (order.status === status) {
+      return order;
+    }
+
+    return this.order.update({
+      where: {
+        id,
+      },
+      data: {
+        status: status,
+      },
+    });
   }
 }

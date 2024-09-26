@@ -1,0 +1,5 @@
+
+export enum SERVICES {
+    PRODUCT_SERVICE = 'PRODUCT_SERVICE',
+}
+   
